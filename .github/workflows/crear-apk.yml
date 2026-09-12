@@ -91,10 +91,17 @@ jobs:
 
       - name: Instalar herramientas Android
         run: |
+          yes | sdkmanager --licenses >/dev/null || true
           sdkmanager \
             "platform-tools" \
             "platforms;android-34" \
             "build-tools;34.0.0"
+
+      - name: Iniciar ADB (evita config errors)
+        run: |
+          "$ANDROID_HOME/platform-tools/adb" kill-server || true
+          "$ANDROID_HOME/platform-tools/adb" start-server || true
+          "$ANDROID_HOME/platform-tools/adb" devices || true
 
       - name: Instalar Godot 4.3 y plantillas
         uses: chickensoft-games/setup-godot@v2
