@@ -147,16 +147,33 @@ jobs:
         run: |
           mkdir -p "$GITHUB_WORKSPACE/build"
 
-          godot --headless --path "$GAME_DIR" \
+          echo "=== RUTAS ==="
+          echo "Proyecto: $GAME_DIR"
+          echo "Java: $JAVA_HOME"
+          echo "Android SDK: $ANDROID_HOME"
+
+          echo "=== AJUSTES DEL PRESET ==="
+          grep -E '^(name|platform|gradle_build/use_gradle_build|architectures/arm64-v8a|package/unique_name)=' \
+            "$GAME_DIR/export_presets.cfg" || true
+
+          echo "=== PLANTILLAS EN LA RUTA HABITUAL ==="
+          find "${XDG_DATA_HOME:-$HOME/.local/share}/godot/export_templates" \
+            -type f -name 'android_*.apk' -print 2>/dev/null || true
+
+          echo "=== BUILD TOOLS INSTALADAS ==="
+          ls "$ANDROID_HOME/build-tools" || true
+
+          echo "=== FIRMA DEBUG ==="
+          if [ -f "$RUNNER_TEMP/descontrol-debug.keystore" ]; then
+            echo "Archivo de firma encontrado"
+          else
+            echo "Archivo de firma NO encontrado en la ruta prevista"
+          fi
+
+          echo "=== EXPORTACION CON REGISTRO DETALLADO ==="
+          godot --headless --verbose \
+            --path "$GAME_DIR" \
             --export-debug "Android" \
             "$GITHUB_WORKSPACE/build/DescontrolZombies-debug.apk"
 
           test -s "$GITHUB_WORKSPACE/build/DescontrolZombies-debug.apk"
-
-      - name: Publicar APK descargable
-        uses: actions/upload-artifact@v5
-        with:
-          name: DescontrolZombies-debug-apk
-          path: build/DescontrolZombies-debug.apk
-          if-no-files-found: error
-          retention-days: 14
