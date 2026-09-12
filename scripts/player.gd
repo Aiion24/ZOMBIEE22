@@ -118,7 +118,7 @@ func _melee_attack(distance: float, damage: int) -> void:
 		if not is_instance_valid(enemy):
 			continue
 		var d: Vector2 = enemy.global_position - global_position
-		var correct_dir := sign(d.x) == facing
+		var correct_dir: bool = signf(d.x) == float(facing)
 		if abs(d.x) <= distance and abs(d.y) <= 120.0 and correct_dir:
 			if enemy.has_method("take_damage"):
 				enemy.take_damage(damage)
@@ -128,7 +128,7 @@ func _ranged_attack() -> void:
 		if not is_instance_valid(enemy):
 			continue
 		var d: Vector2 = enemy.global_position - global_position
-		var correct_dir := sign(d.x) == facing
+		var correct_dir: bool = signf(d.x) == float(facing)
 		if correct_dir and abs(d.x) < 800.0 and abs(d.y) < 150.0:
 			if enemy.has_method("take_damage"):
 				enemy.take_damage(35)
