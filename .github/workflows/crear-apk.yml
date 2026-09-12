@@ -143,6 +143,110 @@ jobs:
             exit 1
           fi
 
+      - name: Aplicar configuracion Android desde Godot
+        run: |
+          export DZ_TEMPLATE_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/godot/export_templates/4.3.stable"
+
+          cat > "$RUNNER_TEMP/configurar_android.gd" <<'GD'
+          @tool
+          extends SceneTree
+
+          func _initialize() -> void:
+              call_deferred("_configurar")
+
+          func _configurar() -> void:
+              var settings: EditorSettings = EditorInterface.get_editor_settings()
+              if settings == null:
+                  push_error("No se pudo acceder a los ajustes del editor.")
+                  quit(1)
+                  return
+
+              var sdk: String = OS.get_environment("ANDROID_HOME")
+              var java: String = OS.get_environment("JAVA_HOME")
+              var key: String = OS.get_environment("RUNNER_TEMP").path_join("descontrol-debug.keystore")
+              var templates: String = OS.get_environment("DZ_TEMPLATE_DIR")
+
+              for archivo in [
+                  key,
+                  templates.path_join("android_debug.apk"),
+                  templates.path_join("android_release.apk")
+              ]:
+                  if not FileAccess.file_exists(archivo):
+                      push_error("Falta el archivo: " + archivo)
+                      quit(1)
+                      return
+
+              print("SDK que tenia configurado Godot: ", settings.get_setting("export/android/android_sdk_path"))
+              print("Java que tenia configurado Godot: ", settings.get_setting("export/android/java_sdk_path"))
+
+              settings.set_setting("export/android/android_sdk_path", sdk)
+              settings.set_setting("export/android/java_sdk_path", java)
+              settings.set_setting("export/android/debug_keystore", key)
+              settings.set_setting("export/android/debug_keystore_user", "androiddebugkey")
+              settings.set_setting("export/android/debug_keystore_pass", "android")
+
+              # Guardar en el archivo de ajustes que utiliza este editor.
+              var settings_path: String = settings.resource_path
+              if settings_path.is_empty():
+                  settings_path = EditorInterface.get_editor_paths().get_config_dir().path_join("editor_settings-4.3.tres")
+
+              if ResourceSaver.save(settings, settings_path) != OK:
+                  push_error("No se pudieron guardar los ajustes: " + settings_path)
+                  quit(1)
+                  return
+
+              # Usar rutas explicitas tambien en el preset.
+              var preset: ConfigFile = ConfigFile.new()
+              if preset.load("res://export_presets.cfg") != OK:
+                  push_error("No se pudo abrir export_presets.cfg.")
+                  quit(1)
+                  return
+
+              var opciones: String = ""
+              for seccion in preset.get_sections():
+                  if preset.get_value(seccion, "name", "") == "Android":
+                      if preset.get_value(seccion, "platform", "") == "Android":
+                          opciones = seccion + ".options"
+                          break
+
+              if opciones.is_empty():
+                  push_error("No existe un preset Android llamado Android.")
+                  quit(1)
+                  return
+
+              preset.set_value(opciones, "gradle_build/use_gradle_build", false)
+              preset.set_value(opciones, "gradle_build/export_format", 0)
+              preset.set_value(opciones, "custom_template/debug", templates.path_join("android_debug.apk"))
+              preset.set_value(opciones, "custom_template/release", templates.path_join("android_release.apk"))
+              preset.set_value(opciones, "keystore/debug", key)
+              preset.set_value(opciones, "keystore/debug_user", "androiddebugkey")
+              preset.set_value(opciones, "keystore/debug_password", "android")
+              preset.set_value(opciones, "package/signed", true)
+
+              if preset.save("res://export_presets.cfg") != OK:
+                  push_error("No se pudo guardar el preset de exportacion.")
+                  quit(1)
+                  return
+
+              print("=== CONFIGURACION GUARDADA ===")
+              print("Archivo de ajustes: ", settings_path)
+              print("Android SDK: ", sdk)
+              print("Java SDK: ", java)
+              print("Plantillas: ", templates)
+              print("Firma debug: ", key)
+              quit(0)
+          GD
+
+          godot --headless --editor \
+            --path "$GAME_DIR" \
+            --script "$RUNNER_TEMP/configurar_android.gd" \
+            2>&1 | tee "$RUNNER_TEMP/android-config.log"
+
+          if grep -Eq 'SCRIPT ERROR:|^ERROR:' "$RUNNER_TEMP/android-config.log"; then
+            echo "::error::Fallo al configurar Android. Revisa este paso."
+            exit 1
+          fi
+          
       - name: Exportar APK debug
         run: |
           mkdir -p "$GITHUB_WORKSPACE/build"
