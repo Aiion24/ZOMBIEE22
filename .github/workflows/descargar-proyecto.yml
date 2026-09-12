@@ -1,0 +1,46 @@
+name: Crear ZIP de DescontrolZombies
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preparar-archivos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Descargar contenido del repositorio
+        uses: actions/checkout@v5
+
+      - name: Generar archivos del prototipo
+        shell: bash
+        run: |
+          # Ejecutar en una carpeta temporal para no sobrescribir
+          # los archivos del repositorio.
+          mkdir -p "$RUNNER_TEMP/descontrol-entrega"
+          cd "$RUNNER_TEMP/descontrol-entrega"
+
+          python3 "$GITHUB_WORKSPACE/bootstrap_descontrolzombies.py"
+
+          test -f DescontrolZombies/project.godot
+
+          # Corregir dos ajustes del generador anterior:
+          # orientación horizontal y exportación sin Gradle personalizado.
+          sed -i \
+            's|window/handheld/orientation=1|window/handheld/orientation=0|' \
+            DescontrolZombies/project.godot
+
+          sed -i \
+            's|gradle_build/use_gradle_build=true|gradle_build/use_gradle_build=false|' \
+            DescontrolZombies/export_presets.cfg
+
+      - name: Publicar proyecto descargable
+        uses: actions/upload-artifact@v5
+        with:
+          name: DescontrolZombies-proyecto
+          path: ${{ runner.temp }}/descontrol-entrega/DescontrolZombies/
+          if-no-files-found: error
+          retention-days: 14
