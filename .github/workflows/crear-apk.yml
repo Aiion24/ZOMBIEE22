@@ -133,22 +133,25 @@ jobs:
           cp "$CONFIG_DIR/editor_settings-4.3.tres" \
              "$CONFIG_DIR/editor_settings-4.tres"
 
-           - name: Importar proyecto
+      - name: Importar y comprobar el proyecto
         run: |
-          test -f "$GITHUB_WORKSPACE/project.godot"
+          godot --headless --path "$GAME_DIR" --editor --import \
+            2>&1 | tee "$RUNNER_TEMP/godot-import.log"
 
-          godot --headless \
-            --path "$GITHUB_WORKSPACE" \
-            --editor --import
+          if grep -Eq 'SCRIPT ERROR:|^ERROR:' "$RUNNER_TEMP/godot-import.log"; then
+            echo "::error::Godot encontro errores. Revisa las lineas anteriores."
+            exit 1
+          fi
 
       - name: Exportar APK debug
         run: |
           mkdir -p "$GITHUB_WORKSPACE/build"
 
-          godot --headless \
-            --path "$GITHUB_WORKSPACE" \
+          godot --headless --path "$GAME_DIR" \
             --export-debug "Android" \
             "$GITHUB_WORKSPACE/build/DescontrolZombies-debug.apk"
+
+          test -s "$GITHUB_WORKSPACE/build/DescontrolZombies-debug.apk"
 
       - name: Publicar APK descargable
         uses: actions/upload-artifact@v5
