@@ -1,4 +1,4 @@
-ame: Crear APK Android
+name: Crear APK Android
 
 on:
   workflow_dispatch:
